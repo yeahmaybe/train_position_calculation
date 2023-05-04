@@ -6,12 +6,13 @@ from Point import Point
 
 
 class Train:
-    def __init__(self, a, b, c, d, x0):
+    def __init__(self, a, b, c, d, w, x0):
         self.x0 = x0
         self.a = a
         self.b = b
         self.c = c
         self.d = d
+        self.w = w
 
     def line(self, x, f, df):
         return df(self.x0) * (x - self.x0) + f(self.x0)
@@ -49,31 +50,31 @@ class Train:
 
     def draw_back_rectangle(self):
 
-        plt.gca().add_patch(Rectangle((p1.x, p1.y), 0.3, self.a + self.b,
+        plt.gca().add_patch(Rectangle((p1.x, p1.y), self.w, self.a + self.b,
                                       angle=np.arctan(v1.y / v1.x) / np.pi * 180 - 90,
                                       edgecolor='blue',
                                       facecolor='none',
-                                      lw=2))
+                                      lw=1))
 
-        plt.gca().add_patch(Rectangle((p3.x, p3.y), 0.3, self.a + self.b,
+        plt.gca().add_patch(Rectangle((p3.x, p3.y), self.w, self.a + self.b,
                                       angle=np.arctan(v1.y / v1.x) / np.pi * 180 + 90,
                                       edgecolor='blue',
                                       facecolor='none',
-                                      lw=2))
+                                      lw=1))
 
     def draw_front_rectangle(self):
 
-        plt.gca().add_patch(Rectangle((p3.x, p3.y), 0.3, self.c + self.d,
+        plt.gca().add_patch(Rectangle((p3.x, p3.y), self.w, self.c + self.d,
                                       angle=np.arctan(v2.y / v2.x) / np.pi * 180 - 90,
                                       edgecolor='blue',
                                       facecolor='none',
-                                      lw=2))
+                                      lw=1))
 
-        plt.gca().add_patch(Rectangle((p5.x, p5.y), 0.3, self.c + self.d,
+        plt.gca().add_patch(Rectangle((p5.x, p5.y), self.w, self.c + self.d,
                                       angle=np.arctan(v2.y / v2.x) / np.pi * 180 + 90,
                                       edgecolor='blue',
                                       facecolor='none',
-                                      lw=2))
+                                      lw=1))
 
     def draw(self):
         self.draw_back_rectangle()
