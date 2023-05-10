@@ -36,12 +36,21 @@ def get_line_projection_points(image) -> list[Point2D]:
     return result
 
 
-def get_3d_from_2d(pyar_camera, points) -> list[Point3D]:
+def get_surface_projections(pyar_camera, points) -> list[Point2D]:
+    wheel = (0, -4.6, 0)
     points_3d = []
     for point in points:
         point_3d = pyar_camera.reproject_point_with_height(point, 0)
         points_3d.append(point_3d)
-    return points_3d
+
+    points_3d = [(pt.x, pt.y, pt.z) for pt in points_3d]
+
+    points_3d = [wheel] + points_3d
+    points_on_surface = [(pt[0], pt[1]) for pt in points_3d]
+    points_on_surface.sort()
+    points_on_surface = [Point2D(pt) for pt in points_on_surface]
+
+    return points_on_surface
 
 
 def get_spline(X, Y):
@@ -63,7 +72,6 @@ def get_spline(X, Y):
 
 
 def draw_spline(image, pyar_camera, polyline, model):
-
     polyline_3d = np.array([(pt, model(pt), 0) for pt in polyline])
     for pt_3d in polyline_3d:
         pt_2d = pyar_camera.project_point(pt_3d)
@@ -78,26 +86,20 @@ def draw_spline(image, pyar_camera, polyline, model):
 def interpolate(front_img):
     image = front_img
     file_name = '../data/city/leftImage.yml'
-    wheel = (0, -4.6, 0)
 
     points = get_line_projection_points(image)
     pyar_camera = pyarCamera.from_yaml(file_name)
 
-    points_3d = get_3d_from_2d(pyar_camera, points)
-    points_3d = [(pt.x, pt.y, pt.z) for pt in points_3d]
+    surface_projections = get_surface_projections(pyar_camera, points)
 
-    # отрисовка полученных точек осевой линиии
-    for pt in points_3d:
+    for pt in surface_projections:
+        pt = (pt.x, pt.y, 0)
         pr_pyar = pyar_camera.project_point(Point3D(pt))
         pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
         cv2.circle(image, pr, 5, (255, 250, 20), 2)
 
-    points_3d = [wheel] + points_3d
-    points_on_surface = [(pt[0], pt[1]) for pt in points_3d]
-    points_on_surface.sort()
-
-    X = [pt[0] for pt in points_on_surface]
-    Y = [pt[1] for pt in points_on_surface]
+    X = [pt.x for pt in surface_projections]
+    Y = [pt.y for pt in surface_projections]
 
     model = get_spline(X, Y)
     print("Полином сплайна:", model, sep='\n')
