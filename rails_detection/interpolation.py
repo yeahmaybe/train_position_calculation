@@ -7,7 +7,7 @@ from pyar import Point3D
 import matplotlib.pyplot as plt
 
 
-def getWheelAngle(spline):
+def getWheelAngle(spline) -> float:
     derivative = np.polyder(spline, 1)
     tan = derivative[0]
     wheel_angle = min(np.pi / 2 - np.arctan(tan), np.pi / 2 + np.arctan(tan))
@@ -15,7 +15,7 @@ def getWheelAngle(spline):
     return wheel_angle
 
 
-def get_line_projection_points(image):
+def get_line_projection_points(image) -> list[Point2D]:
     hsv_min = (0, 200, 200)
     hsv_max = (50, 255, 255)
     kernel = np.ones((2, 2), 'uint8')
@@ -25,25 +25,21 @@ def get_line_projection_points(image):
     # thresh = cv2.erode(thresh, kernel, iterations=1)
     cv2.imshow('thresh', thresh)
 
-
-    nonZeroCoordinates = cv2.findNonZero(thresh)
+    non_zero_coordinates = cv2.findNonZero(thresh)
     pts = []
-    for i, pt in enumerate(nonZeroCoordinates):
+    for i, pt in enumerate(non_zero_coordinates):
         if i % 100 == 0:
             pts.append((pt[0][0], pt[0][1]))
-    print(pts)
 
-    #lines = cv2.HoughLinesP(thresh, 1, np.pi / 180, 0, minLineLength=20, maxLineGap=10)
-    #pts = [(line[0][0], line[0][1]) for line in lines]
     pts.sort()
-    return pts
+    result = [Point2D(pt) for pt in pts]
+    return result
 
 
-def get_3d_from_2d(pyar_camera, points):
+def get_3d_from_2d(pyar_camera, points) -> list[Point3D]:
     points_3d = []
     for point in points:
-        point_2d = Point2D(point)
-        point_3d = pyar_camera.reproject_point_with_height(point_2d, 0)
+        point_3d = pyar_camera.reproject_point_with_height(point, 0)
         points_3d.append(point_3d)
     return points_3d
 
