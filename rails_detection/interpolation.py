@@ -91,7 +91,7 @@ def get_circle(surface_projections):
         data.append((pt.x, pt.y))
     print(data)
     minimum = {}
-    points = [[data[i], data[j], data[k]] for i in range(len(data) - 2) for j in range(i + 1, len(data) - 1) for k in range(j + 1, len(data))]
+    points = [[data[0], data[j], data[k]] for j in range(1, len(data) - 1) for k in range(j + 1, len(data))]
     for z in points:
         x1, y1 = z[0]
         x2, y2 = z[1]
@@ -142,18 +142,6 @@ def get_circle(surface_projections):
 
     return points
 
-def acc_calculate(prs, circle):
-    acc = []
-    for pt in prs:
-        delt_x = circle[8] - pt[0]
-        delt_y = circle[9] - pt[1]
-        dif = ((delt_x ** 2 + delt_y ** 2) ** (1 / 2))
-        dif = dif - circle[7]
-        dif = abs(dif / circle[7])
-        acc.append(dif)
-    acc_mean = 1 - mean(acc)
-    print("Точность аппроксимации - ", acc_mean)
-
 def interpolate(front_img):
     image = front_img
     file_name = '../data/city/leftImage.yml'
@@ -163,10 +151,13 @@ def interpolate(front_img):
 
     surface_projections = get_surface_projections(pyar_camera, points)
 
+    prs = []
+
     for pt in surface_projections:
         pt = (pt.x, pt.y, 0)
         pr_pyar = pyar_camera.project_point(Point3D(pt))
         pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
+        prs.append(pr)
         cv2.circle(image, pr, 5, (255, 250, 20), 2)
         cv2.imshow('image', image)
 
@@ -175,17 +166,28 @@ def interpolate(front_img):
 
     circle = get_circle(surface_projections)
 
-    prs = []
+    prs_circ = []
+
+    mins = []
 
     for pt in circle:
-        pt = (pt[0], pt[1], 0)
-        if (pt[0] > 0 and pt[1] > 0):
+        pt = (round(pt[0], 2), round(pt[1], 2), 0)
+        if ((abs(pt[0]) == 0 and round(pt[1], 1) == -4.6) or pt[1] >= 0):
+            prs_circ.append((pt[0], pt[1]))
             pr_pyar = pyar_camera.project_point(Point3D(pt))
             pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
             cv2.circle(image, pr, 4, (0, 0, 255), 3)
-            prs.append(pr)
 
     cv2.imshow('image', image)
+
+    for pt in surface_projections:
+        list_r = []
+        for pt_c in prs_circ:
+            list_r.append((((pt.x - pt_c[0]) ** 2) + (pt.y - pt_c[1]) ** 2) ** (1 / 2))
+        mins.append(min(list_r) ** 2)
+    print("Точность аппроксимации:", sum(mins))
+
+
 
 
     model = get_spline(X, Y)
@@ -207,6 +209,5 @@ img = cv2.imread("../img.png")
 img1 = cv2.imread("../img1.png")
 img2 = cv2.imread("../img2.png")
 img3 = cv2.imread("../img3.png")
-img5 = cv2.imread("../img5.png")
 
-interpolate(img2)
+interpolate(img)
