@@ -6,6 +6,7 @@ from pyar import Point2D
 from pyar import Point3D
 import matplotlib.pyplot as plt
 from statistics import mean
+from math import sin, cos, radians
 
 
 def getWheelAngle(spline) -> float:
@@ -87,7 +88,7 @@ def get_circle(surface_projections):
     data = []
 
     for pt in surface_projections:
-        data.append((pt[0], pt[1]))
+        data.append((pt.x, pt.y))
     print(data)
     minimum = {}
     points = [[data[i], data[j], data[k]] for i in range(len(data) - 2) for j in range(i + 1, len(data) - 1) for k in range(j + 1, len(data))]
@@ -126,7 +127,20 @@ def get_circle(surface_projections):
     print('Радиус окружности:', minimum[min(minimum)][7])
     print('Начальные координаты:', str(minimum[min(minimum)][8]) + ', ' + str(minimum[min(minimum)][9]))
 
-    return minimum[min(minimum)]
+    a0 = minimum[min(minimum)][8]
+    b0 = minimum[min(minimum)][9]
+    R = minimum[min(minimum)][7]
+
+    points = []
+
+    for i in range(360):
+        new_i = radians(i)
+        si = sin(new_i)
+        x = a0 + R * cos(new_i)
+        y = b0 + R * sin(new_i)
+        points.append((x, y))
+
+    return points
 
 def acc_calculate(prs, circle):
     acc = []
@@ -149,27 +163,30 @@ def interpolate(front_img):
 
     surface_projections = get_surface_projections(pyar_camera, points)
 
-    prs = []
-
     for pt in surface_projections:
         pt = (pt.x, pt.y, 0)
         pr_pyar = pyar_camera.project_point(Point3D(pt))
         pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
-        prs.append(pr)
         cv2.circle(image, pr, 5, (255, 250, 20), 2)
         cv2.imshow('image', image)
 
     X = [pt.x for pt in surface_projections]
     Y = [pt.y for pt in surface_projections]
 
-    circle = get_circle(prs)
+    circle = get_circle(surface_projections)
 
-    point = (int(circle[8]), int(circle[9]))
+    prs = []
 
-    cv2.circle(image, point, int(circle[7]), (0, 0, 255), 5)
+    for pt in circle:
+        pt = (pt[0], pt[1], 0)
+        if (pt[0] > 0 and pt[1] > 0):
+            pr_pyar = pyar_camera.project_point(Point3D(pt))
+            pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
+            cv2.circle(image, pr, 4, (0, 0, 255), 3)
+            prs.append(pr)
+
     cv2.imshow('image', image)
 
-    acc_calculate(prs, circle)
 
     model = get_spline(X, Y)
     print("Полином сплайна:", model, sep='\n')
