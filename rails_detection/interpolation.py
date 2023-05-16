@@ -8,13 +8,8 @@ import matplotlib.pyplot as plt
 from statistics import mean
 from math import sin, cos, radians
 
-
-def getWheelAngle(spline) -> float:
-    derivative = np.polyder(spline, 1)
-    tan = derivative[0]
-    wheel_angle = min(np.pi / 2 - np.arctan(tan), np.pi / 2 + np.arctan(tan))
-
-    return wheel_angle
+from CircleEstimator import CircleEstimator
+from PolynomeEstimator import PolynomeEstimator
 
 
 def get_line_projection_points(image) -> list[Point2D]:
@@ -55,92 +50,41 @@ def get_surface_projections(pyar_camera, points) -> list[Point2D]:
     return points_on_surface
 
 
-def get_spline(X, Y):
-    weights = [1 / np.e ** (i ** 3 / 20) for i in range(len(Y))]
-    print("Веса точек для регрессии:", weights)
+'''
+        for pt in circle:
+            pt = (round(pt[0], 2), round(pt[1], 2), 0)
+            if (abs(pt[0]) == 0 and round(pt[1], 1) == -4.6) or pt[1] >= 0:
+                prs_circ.append((pt[0], pt[1]))
+                #pr_pyar = self.pyar_camera.project_point(Point3D(pt))
+                #pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
+                #cv2.circle(image, pr, 4, (0, 0, 255), 3)
 
-    quad_polynom = np.polyfit(X, Y, 2, w=weights, full=True)
-    line_polynom = np.polyfit(X, Y, 1, w=weights, full=True)
-
-    # словарь {ошибка: полином}
-    hypotheses = {
-        quad_polynom[1][0]: quad_polynom[0],
-        line_polynom[1][0]: line_polynom[0]
-    }
-
-    keys = list(hypotheses.keys())
-    model = np.poly1d(hypotheses[min(keys)])
-    return model
+        #cv2.imshow('image', image)
+'''
 
 
-def draw_spline(image, pyar_camera, polyline, model):
-    polyline_3d = np.array([(pt, model(pt), 0) for pt in polyline])
+def draw_points(image, pyar_camera, points, color):
+    polyline_3d = np.array([(pt[0], pt[1], 0) for pt in points])
     for pt_3d in polyline_3d:
         pt_2d = pyar_camera.project_point(pt_3d)
         pt = (int(pt_2d.x), int(pt_2d.y))
-        cv2.circle(image, pt, 2, (255, 0, 0), 2)
+        cv2.circle(image, pt, 2, color, 2)
 
-    cv2.imshow('result', image)
-    cv2.waitKey()
-    cv2.destroyAllWindows()
 
-def get_circle(surface_projections):
-    data = []
+def chooseEstimator(surface_projections):
+    circle_error = CircleEstimator().get_error(surface_projections)
+    polynome_error = PolynomeEstimator().get_error(surface_projections)
 
-    for pt in surface_projections:
-        data.append((pt.x, pt.y))
-    print(data)
-    minimum = {}
-    points = [[data[0], data[j], data[k]] for j in range(1, len(data) - 1) for k in range(j + 1, len(data))]
-    for z in points:
-        x1, y1 = z[0]
-        x2, y2 = z[1]
-        x3, y3 = z[2]
-        try:
-            y0 = (2 * (x1 - x3) * (y2 ** 2 - y1 ** 2 - x1 ** 2 + x2 ** 2) + 2 * (x1 - x2) * (
-                    x1 ** 2 - x3 ** 2 - y3 ** 2 + y1 ** 2)) / (
-                         4 * (y2 - y1) * (x1 - x3) - 4 * (x1 - x2) * (y3 - y1))
-        except ZeroDivisionError:
-            continue
-        if x1 - x3 != 0:
-            x0 = ((x1 ** 2 - x3 ** 2 - y3 ** 2 + y1 ** 2) + 2 * y0 * (y3 - y1)) / (2 * (x1 - x3))
-        if x1 - x2 != 0:
-            x0 = ((x1 ** 2 - x2 ** 2 - y2 ** 2 + y1 ** 2) + 2 * y0 * (y2 - y1)) / (2 * (x1 - x2))
-        R = ((x0 - x1) ** 2 + (y0 - y1) ** 2) ** (1 / 2)
+    hypotheses = {
+        circle_error: CircleEstimator(),
+        #polynome_error: PolynomeEstimator()
+    }
+    least_error = min(hypotheses.keys())
 
-        n1, n2, n3 = 0, 0, 0
+    print("Ошибка на окружности: ", circle_error)
+    print("Ошибка на полиномах: ", polynome_error)
+    return hypotheses[least_error]
 
-        for t in data:
-            if round((t[0] - x0) ** 2 + (t[1] - y0) ** 2, 3) < round(R ** 2, 3):
-                n1 += 1
-            elif round((t[0] - x0) ** 2 + (t[1] - y0) ** 2, 3) > round(R ** 2, 3):
-                n2 += 1
-            else:
-                n3 += 1
-        minimum[abs(n1 - n2)] = [
-            '(x - {:.1f}) ** 2 + (y - {:.1f}) ** 2 = {:.1f} ** 2'.format(x0, y0, R).replace('- -', '+ '), z[0], z[1],
-            z[2], n1, n2, n3, R, x0, y0]
-
-    print('Окружность:', minimum[min(minimum)][0])
-    print('Три точки, определяющие окружность:', str(minimum[min(minimum)][1]) + ',',
-          str(minimum[min(minimum)][2]) + ',', minimum[min(minimum)][3])
-    print('Радиус окружности:', minimum[min(minimum)][7])
-    print('Начальные координаты:', str(minimum[min(minimum)][8]) + ', ' + str(minimum[min(minimum)][9]))
-
-    a0 = minimum[min(minimum)][8]
-    b0 = minimum[min(minimum)][9]
-    R = minimum[min(minimum)][7]
-
-    points = []
-
-    for i in range(360):
-        new_i = radians(i)
-        si = sin(new_i)
-        x = a0 + R * cos(new_i)
-        y = b0 + R * sin(new_i)
-        points.append((x, y))
-
-    return points
 
 def interpolate(front_img):
     image = front_img
@@ -152,7 +96,6 @@ def interpolate(front_img):
     surface_projections = get_surface_projections(pyar_camera, points)
 
     prs = []
-
     for pt in surface_projections:
         pt = (pt.x, pt.y, 0)
         pr_pyar = pyar_camera.project_point(Point3D(pt))
@@ -161,53 +104,55 @@ def interpolate(front_img):
         cv2.circle(image, pr, 5, (255, 250, 20), 2)
         cv2.imshow('image', image)
 
-    X = [pt.x for pt in surface_projections]
-    Y = [pt.y for pt in surface_projections]
 
-    circle = get_circle(surface_projections)
-
-    prs_circ = []
-
-    mins = []
-
-    for pt in circle:
-        pt = (round(pt[0], 2), round(pt[1], 2), 0)
-        if ((abs(pt[0]) == 0 and round(pt[1], 1) == -4.6) or pt[1] >= 0):
-            prs_circ.append((pt[0], pt[1]))
-            pr_pyar = pyar_camera.project_point(Point3D(pt))
-            pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
-            cv2.circle(image, pr, 4, (0, 0, 255), 3)
-
-    cv2.imshow('image', image)
-
-    for pt in surface_projections:
-        list_r = []
-        for pt_c in prs_circ:
-            list_r.append((((pt.x - pt_c[0]) ** 2) + (pt.y - pt_c[1]) ** 2) ** (1 / 2))
-        mins.append(min(list_r) ** 2)
-    print("Точность аппроксимации:", sum(mins))
+    surface_projections = surface_projections[:10]
 
 
-
-
-    model = get_spline(X, Y)
-    print("Полином сплайна:", model, sep='\n')
-
-    wheel_angle = getWheelAngle(model)
-    print("Угол поворота передней тележки: ", wheel_angle / np.pi * 180, "градусов")
+    estimator = chooseEstimator(surface_projections)
+    wheel_angle = estimator.getWheelAngle(surface_projections) / np.pi * 180
+    print("Угол поворота передней тележки: ", wheel_angle, "градусов")
 
     plt.axis('equal')
+
+    X = [pt.x for pt in surface_projections]
+    Y = [pt.y for pt in surface_projections]
     plt.scatter(X, Y)
 
-    polyline = np.linspace(-1, 5, 50)
-    plt.plot(polyline, model(polyline))
+    all_circle_points = CircleEstimator().get_points(surface_projections)
+    all_poly_points = PolynomeEstimator().get_points(surface_projections)
+    c_points = []
+    p_points = []
+    for pt in all_circle_points:
+        if -30 <= pt[0] <= 30:
+            c_points.append(pt)
+
+    x = [pt[0] for pt in c_points]
+    y = [pt[1] for pt in c_points]
+    plt.plot(x, y)
     plt.show()
 
-    draw_spline(image, pyar_camera, polyline, model)
+    draw_points(image, pyar_camera, all_circle_points, (200, 100, 100))
+    #draw_points(image, pyar_camera, all_poly_points, (100, 200, 100))
+
+    cv2.putText(image, "ANGLE: "+str(wheel_angle), (50, 500), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+    cv2.imshow('result', image)
+    cv2.waitKey()
+    cv2.destroyAllWindows()
+
+    print("==============================")
+
+
+
+
 
 img = cv2.imread("../img.png")
-img1 = cv2.imread("../img1.png")
-img2 = cv2.imread("../img2.png")
 img3 = cv2.imread("../img3.png")
+img5 = cv2.imread("../img5.png")
 
+interpolate(img5)
+interpolate(img3)
 interpolate(img)
+
+
+
+
