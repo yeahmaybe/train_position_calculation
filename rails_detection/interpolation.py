@@ -5,6 +5,8 @@ from pyar import Camera as pyarCamera, Size
 from pyar import Point2D
 from pyar import Point3D
 import matplotlib.pyplot as plt
+from statistics import mean
+from math import sin, cos, radians
 
 
 def getWheelAngle(spline) -> float:
@@ -82,6 +84,63 @@ def draw_spline(image, pyar_camera, polyline, model):
     cv2.waitKey()
     cv2.destroyAllWindows()
 
+def get_circle(surface_projections):
+    data = []
+
+    for pt in surface_projections:
+        data.append((pt.x, pt.y))
+    print(data)
+    minimum = {}
+    points = [[data[0], data[j], data[k]] for j in range(1, len(data) - 1) for k in range(j + 1, len(data))]
+    for z in points:
+        x1, y1 = z[0]
+        x2, y2 = z[1]
+        x3, y3 = z[2]
+        try:
+            y0 = (2 * (x1 - x3) * (y2 ** 2 - y1 ** 2 - x1 ** 2 + x2 ** 2) + 2 * (x1 - x2) * (
+                    x1 ** 2 - x3 ** 2 - y3 ** 2 + y1 ** 2)) / (
+                         4 * (y2 - y1) * (x1 - x3) - 4 * (x1 - x2) * (y3 - y1))
+        except ZeroDivisionError:
+            continue
+        if x1 - x3 != 0:
+            x0 = ((x1 ** 2 - x3 ** 2 - y3 ** 2 + y1 ** 2) + 2 * y0 * (y3 - y1)) / (2 * (x1 - x3))
+        if x1 - x2 != 0:
+            x0 = ((x1 ** 2 - x2 ** 2 - y2 ** 2 + y1 ** 2) + 2 * y0 * (y2 - y1)) / (2 * (x1 - x2))
+        R = ((x0 - x1) ** 2 + (y0 - y1) ** 2) ** (1 / 2)
+
+        n1, n2, n3 = 0, 0, 0
+
+        for t in data:
+            if round((t[0] - x0) ** 2 + (t[1] - y0) ** 2, 3) < round(R ** 2, 3):
+                n1 += 1
+            elif round((t[0] - x0) ** 2 + (t[1] - y0) ** 2, 3) > round(R ** 2, 3):
+                n2 += 1
+            else:
+                n3 += 1
+        minimum[abs(n1 - n2)] = [
+            '(x - {:.1f}) ** 2 + (y - {:.1f}) ** 2 = {:.1f} ** 2'.format(x0, y0, R).replace('- -', '+ '), z[0], z[1],
+            z[2], n1, n2, n3, R, x0, y0]
+
+    print('Окружность:', minimum[min(minimum)][0])
+    print('Три точки, определяющие окружность:', str(minimum[min(minimum)][1]) + ',',
+          str(minimum[min(minimum)][2]) + ',', minimum[min(minimum)][3])
+    print('Радиус окружности:', minimum[min(minimum)][7])
+    print('Начальные координаты:', str(minimum[min(minimum)][8]) + ', ' + str(minimum[min(minimum)][9]))
+
+    a0 = minimum[min(minimum)][8]
+    b0 = minimum[min(minimum)][9]
+    R = minimum[min(minimum)][7]
+
+    points = []
+
+    for i in range(360):
+        new_i = radians(i)
+        si = sin(new_i)
+        x = a0 + R * cos(new_i)
+        y = b0 + R * sin(new_i)
+        points.append((x, y))
+
+    return points
 
 def interpolate(front_img):
     image = front_img
@@ -92,14 +151,44 @@ def interpolate(front_img):
 
     surface_projections = get_surface_projections(pyar_camera, points)
 
+    prs = []
+
     for pt in surface_projections:
         pt = (pt.x, pt.y, 0)
         pr_pyar = pyar_camera.project_point(Point3D(pt))
         pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
+        prs.append(pr)
         cv2.circle(image, pr, 5, (255, 250, 20), 2)
+        cv2.imshow('image', image)
 
     X = [pt.x for pt in surface_projections]
     Y = [pt.y for pt in surface_projections]
+
+    circle = get_circle(surface_projections)
+
+    prs_circ = []
+
+    mins = []
+
+    for pt in circle:
+        pt = (round(pt[0], 2), round(pt[1], 2), 0)
+        if ((abs(pt[0]) == 0 and round(pt[1], 1) == -4.6) or pt[1] >= 0):
+            prs_circ.append((pt[0], pt[1]))
+            pr_pyar = pyar_camera.project_point(Point3D(pt))
+            pr = tuple(map(int, [pr_pyar.x, pr_pyar.y]))
+            cv2.circle(image, pr, 4, (0, 0, 255), 3)
+
+    cv2.imshow('image', image)
+
+    for pt in surface_projections:
+        list_r = []
+        for pt_c in prs_circ:
+            list_r.append((((pt.x - pt_c[0]) ** 2) + (pt.y - pt_c[1]) ** 2) ** (1 / 2))
+        mins.append(min(list_r) ** 2)
+    print("Точность аппроксимации:", sum(mins))
+
+
+
 
     model = get_spline(X, Y)
     print("Полином сплайна:", model, sep='\n')
@@ -120,6 +209,5 @@ img = cv2.imread("../img.png")
 img1 = cv2.imread("../img1.png")
 img2 = cv2.imread("../img2.png")
 img3 = cv2.imread("../img3.png")
-img5 = cv2.imread("../img5.png")
 
-interpolate(img5)
+interpolate(img)
