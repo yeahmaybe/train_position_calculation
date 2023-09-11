@@ -3,8 +3,9 @@ import numpy as np
 from pyar import Point3D
 from math import sin, cos, radians
 
+from src.Estimators.SplineEstimator import SplineEstimator
 
-class CircleEstimator:
+class CircleEstimator(SplineEstimator):
 
     def __init__(self):
         pass
@@ -24,7 +25,7 @@ class CircleEstimator:
             data.append((pt.x, pt.y))
 
         minimum = {}
-        points = [[data[0], data[j], data[k]] for j in range(1, len(data) - 1) for k in range(j + 1, len(data))]
+        points = [[data[0], data[k], data[i]] for k in range(1, len(data)-1) for i in range(k+1, len(data))]
         for z in points:
             x1, y1 = z[0]
             x2, y2 = z[1]
@@ -39,7 +40,7 @@ class CircleEstimator:
                 x0 = ((x1 ** 2 - x3 ** 2 - y3 ** 2 + y1 ** 2) + 2 * y0 * (y3 - y1)) / (2 * (x1 - x3))
             if x1 - x2 != 0:
                 x0 = ((x1 ** 2 - x2 ** 2 - y2 ** 2 + y1 ** 2) + 2 * y0 * (y2 - y1)) / (2 * (x1 - x2))
-            R = ((x0 - x1) ** 2 + (y0 - y1) ** 2) ** (1 / 2)
+            R = min(20, ((x0 - x1) ** 2 + (y0 - y1) ** 2) ** (1 / 2) )
 
             n1, n2, n3 = 0, 0, 0
 
@@ -81,19 +82,13 @@ class CircleEstimator:
         return points
 
     def get_error(self, surface_projections) -> float:
-        circle = self.get_points(surface_projections)
-        prs_circ = []
-        for pt in circle:
-            pt = (round(pt[0], 2), round(pt[1], 2), 0)
-            prs_circ.append((pt[0], pt[1]))
         mins = []
-
+        R, (x, y) = self.get_radius_center(surface_projections)
+        print("Радиус ", R)
+        print("Центр ", x, y)
         for pt in surface_projections:
-            list_r = []
-            for pt_c in prs_circ:
-                list_r.append((((pt.x - pt_c[0]) ** 2) + (pt.y - pt_c[1]) ** 2) ** (1 / 2))
-            mins.append(min(list_r) ** 2)
-        return sum(mins)
+            mins.append((np.sqrt((x-pt.x)**2 + (y-pt.y)**2) - R)**2)
+        return np.sum(np.sqrt(mins))
 
     def getWheelAngle(self, surface_projections) -> float:
         R, (x0, y0) = self.get_radius_center(surface_projections)

@@ -39,7 +39,7 @@ def create_frame(t):
     plt.savefig(f'img_{t}.png',
                 transparent=False,
                 facecolor='white'
-                )
+    )
 
 
 time = list(map(int, np.arange(0, 10, 0.05)*20))
